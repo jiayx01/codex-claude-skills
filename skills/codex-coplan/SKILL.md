@@ -1,24 +1,24 @@
 ---
 name: codex-coplan
-description: 拉外部模型（Codex）一起做方案——两个模型独立起草、对齐分歧、合并成一版 plan。仅当用户主动点名要问 Codex（如「和 codex 讨论一下」「问问 codex 怎么看这个方案」）时加载；方案有分歧、想要新视角，先自己想，别自动拉 Codex。
+description: Bring in an external model (Codex) to co-develop a plan — both models draft independently, align on disagreements, and merge into one plan. Load this only when the user explicitly names Codex (e.g. "let's discuss this with Codex," "what does Codex think about this approach") — don't auto-trigger just because a plan has disagreements or could use a fresh angle; think it through yourself first.
 ---
 
-# 和外部模型一起做 plan
+# Co-developing a plan with an external model
 
-## 流程
+## Process
 
-1. **备料**——Codex 拿不到你的对话上下文，按场景把它需要的整理齐：背景和目标、硬约束、判断标准、相关文件和目录的**绝对路径**（点名入口，让它自己读）、已经试过什么和为什么不行、环境事实（表结构/接口契约/配置项、量级、权限、排期，视场景而定）。缺的自己查，查不到再问用户。
+1. **Prep the brief** — Codex has no access to your conversation history, so assemble what it needs for this scenario: background and goals, hard constraints, judgment criteria, **absolute paths** to relevant files and directories (name the entry points and let it read them itself), what's already been tried and why it didn't work, and environmental facts (schema/API contracts/config values, scale, permissions, timeline — whatever applies). Look up what's missing yourself; only ask the user if you can't find it.
 
-2. **第一轮独立起草**——你自己出一版，同时派 Codex 出一版，**只有这一轮互相不看**：两版都被对方带偏，就没有第二视角可比了。给它的只有第 1 步那份料。**试过且明确失败的写清原因**（防它重犯）；**只是用户不满意、没验证过的只写标题**（写了理由就锚定）。给它配一个和你不同的普通职业视角（别用名人）。
+2. **Round one: independent drafts** — write your own version, and dispatch Codex to write its own, **with zero cross-reference on this round only**: if both versions get pulled toward each other, there's no independent second opinion left to compare against. Give it nothing but the brief from step 1. **For anything you already tried and know failed, state the reason** (so it doesn't repeat the mistake); **for anything you're just not satisfied with but haven't actually verified, give it only the label, no reasoning** (a stated reason becomes an anchor). Assign it a plausible professional persona different from your own default framing (skip celebrities).
 
-3. **分类差异**（自己做，不派）：**共识点**（两边都有，直接进 plan）、**单边点**（只有一边有）、**冲突点**（同一问题给了相反做法）。
+3. **Classify the differences** (you do this yourself, don't dispatch it): **agreements** (both sides have it — goes straight into the plan), **one-sided points** (only one side has it), **conflicts** (same question, opposite answers).
 
-4. **追问**——**这一轮起把你的草稿全文给它**，之后一直开着，讨论要基于同一份材料。只派单边点和冲突点，问具体问题，不问「你评价一下对方」。用 `--resume` 接上一轮，它才记得自己的主张：
-   - 单边点 →「<某做法> 你没考虑，是不适用还是漏了？不适用的话是哪个约束挡的」
-   - 冲突点 →「你主张 A、另一版主张 B，分歧在对 <某事> 的假设。你的假设是什么，什么条件下它不成立」
+4. **Follow up** — **starting this round, share your full draft with it**, and keep the thread open from here on; the discussion needs to run on the same shared material going forward. Only follow up on one-sided points and conflicts, with specific questions — never "what do you think of the other version." Use `--resume` to continue the same thread, or it won't remember its own positions:
+   - One-sided → "You didn't account for \<approach>. Is it inapplicable, or did you miss it? If inapplicable, which constraint rules it out?"
+   - Conflict → "You argued A, the other draft argued B — the disagreement comes down to an assumption about \<something>. What's your assumption, and under what conditions does it break?"
 
-5. **吸收进你的草稿，重新对比**——回第 3 步再分一次类。**还有新的单边点或冲突点就继续追问**，连续一轮没有新增才停。别让两个模型互相说服，轮次一多两边趋同。**软上限 3 轮**：追问满 3 轮还有新增，别再等它收敛，直接进第 6 步用事实裁决，剩下的分歧按判断标准取舍。
+5. **Fold the answers into your draft, then re-classify** — go back to step 3. **Keep following up as long as new one-sided points or conflicts show up**; stop only once a round adds nothing new. Don't let the two models talk each other into agreement — more rounds just means more convergence. **Soft cap: 3 rounds.** If round 3 still surfaces something new, stop waiting for convergence — go straight to step 6 and resolve by checking the facts, and settle whatever's left using your own judgment criteria.
 
-6. **核前提解分歧**——分歧多半是对事实的假设不同。能查的自己查（有没有这个字段、量级、权限、排期），别转述模型的说法。
+6. **Resolve disagreements by checking premises** — most disagreements trace back to different assumptions about facts. Check what you can check yourself (does this field exist, what's the actual scale, is this permission granted, what's the real timeline) — don't just take either model's account of it.
 
-7. **自己决断，交付一版方案**——查不了的按判断标准取舍。只有适用条件互斥时才给多个解，每个标明适用条件。**别写「Codex 认为……我认为……」，交付吸纳后的方案。**
+7. **Make the call, deliver one plan** — whatever you can't verify, settle with your own judgment criteria. Only offer multiple solutions when the conditions for applying them are mutually exclusive, and label each with when it applies. **Never write "Codex thinks X, I think Y" — deliver the plan that's already absorbed both inputs.**

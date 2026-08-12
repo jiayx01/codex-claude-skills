@@ -1,53 +1,53 @@
 ---
 name: codex-orchestrator
-description: 把执行任务委派给 Codex（Claude 规划与验收）。仅当用户点名 Codex 时加载；任务再大，用户没提 Codex 就自己干。
+description: Delegate execution tasks to Codex (Claude plans and reviews). Load this only when the user names Codex explicitly — no matter how big the task is, if the user hasn't mentioned Codex, do it yourself.
 ---
 
-# Codex Orchestrator：Claude 规划，Codex 执行
+# Codex Orchestrator: Claude plans, Codex executes
 
-你做规划、拆解、验收，执行默认委派给 Codex。任务书怎么写、`--write`/`--background`/`--resume` 怎么选，官方插件自带的 `codex:codex-cli-runtime` 和 `codex:gpt-5-4-prompting` 已经管了，别重复操心。以下只是那两个 skill 覆盖不到的东西。
+You plan, break down the work, and review; execution defaults to delegation to Codex. How to write the task brief, and when to use `--write`/`--background`/`--resume`, is already covered by the official plugin's built-in `codex:codex-cli-runtime` and `codex:gpt-5-4-prompting` — don't re-litigate that. What follows is only what those two Skills don't cover.
 
-用不用 Codex 由用户自己判断，别替他算经济账、别劝阻。
+Whether to use Codex at all is the user's call — don't run a cost-benefit check on their behalf, and don't talk them out of it.
 
-## 调用路径
+## Invocation path
 
-- **目标项目 == 会话 cwd**：`Agent` 工具，`subagent_type: "codex:codex-rescue"`
-- **目标在 cwd 外**：Bash 直调 companion，带 `--cwd`（`--cwd` 不在 rescue 的 flag 剥离白名单里，走 Agent 路径写它会混进 prompt 文本）
+- **Target project == session cwd**: `Agent` tool, `subagent_type: "codex:codex-rescue"`
+- **Target is outside cwd**: call the companion script directly via Bash, with `--cwd` (`--cwd` isn't on rescue's flag allowlist — going through the Agent path would leak it into the prompt text instead)
 
 ```bash
 COMPANION=$(ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs 2>/dev/null | sort -V | tail -1)
-node "$COMPANION" task "<任务书>" --write --model <你的模型> --effort <你的档位> --cwd <目标项目根>
+node "$COMPANION" task "<task brief>" --write --model <your model> --effort <your tier> --cwd <target project root>
 ```
 
-`--model`/`--effort` 换成你自己账号或网关实际支持的值。
+Swap `--model`/`--effort` for whatever your own account or gateway actually supports.
 
-**绝不用 `Skill(codex:rescue)`**——会重入 slash command 挂死会话。`/codex:rescue` 是用户手打的入口。
+**Never use `Skill(codex:rescue)`** — it re-enters the slash command and hangs the session. `/codex:rescue` is the user-typed entry point only.
 
-**effort 档位**：companion 的 `--effort` 白名单目前只到 `xhigh`，传 `ultra` 会直接抛错；要用 ultra 只能不传这个参数，走 config 里的默认值。
+**Effort tier**: the companion's `--effort` allowlist currently tops out at `xhigh` — passing `ultra` throws immediately. To actually get ultra, omit the flag and let it fall through to the config default.
 
-## 沙箱：可写根 = cwd
+## Sandbox: the writable root is cwd
 
-companion 硬编码 `sandbox: write ? "workspace-write" : "read-only"`，**覆盖** `~/.codex/config.toml` 里的 `danger-full-access`。所以可写根是传入的 cwd，**不是任务书里写的路径**——目标在 cwd 外时要么写失败，要么写错位置还自报完成（实测发生过）。
+The companion hardcodes `sandbox: write ? "workspace-write" : "read-only"`, which **overrides** `danger-full-access` in `~/.codex/config.toml`. So the writable root is whatever cwd you passed in — **not** the path written in the task brief. When the target is outside cwd, the write either fails outright, or lands in the wrong place while Codex still self-reports success (this has happened in practice).
 
-## 后台取结果
+## Checking results in the background
 
 ```bash
-node "$COMPANION" status <job-id>     # 进度，或 --wait --timeout-ms <ms> 阻塞等
-node "$COMPANION" result <job-id>     # 最终产出
+node "$COMPANION" status <job-id>     # progress, or --wait --timeout-ms <ms> to block until done
+node "$COMPANION" result <job-id>     # final output
 ```
 
-job 按 workspace root 存：委派时带了 `--cwd`，取结果也必须在同一 cwd 下跑。`/codex:status`、`/codex:result` 是 `disable-model-invocation`，你只能 Bash 直调。
+Jobs are stored by workspace root: if you delegated with `--cwd`, you have to check results from that same cwd. `/codex:status` and `/codex:result` are `disable-model-invocation` — you can only call them directly via Bash.
 
-互不依赖的任务可以并行派多个 Agent，但**同一仓库并行写会冲突**——同仓库串行，或先拆到不同目录/分支。
+Independent tasks can be dispatched to multiple Agents in parallel, but **parallel writes to the same repo will conflict** — serialize within a repo, or split the work across different directories/branches first.
 
-## 验收（rescue 明确不做，是你的活）
+## Review (rescue explicitly doesn't do this — it's on you)
 
-1. **自己重跑**测试/复现脚本，不采信 Codex 自报的「已通过」
-2. **读 diff**，要 Codex 给出改动的 file:line 清单，核对：范围没超任务书（没动无关文件、没删测试蒙混）、改动确实落在目标目录
-3. 实现方案与你的规划冲突时，判断优劣再接受
+1. **Re-run the tests or repro script yourself** — don't take Codex's self-reported "passing" at face value
+2. **Read the diff.** Have Codex provide a file:line list of every change, and check: scope didn't exceed the task brief (no unrelated files touched, no tests quietly deleted), changes actually landed in the target directory
+3. If the implementation conflicts with your plan, judge which is actually better before accepting it
 
-不过关看性质决定下一轮：**局部没改对** → 带反馈 `--resume`；**方向错了** → `--fresh` 重开，resume 会带着错误上下文越修越偏。
+What to do next depends on how it failed: **partially wrong** → `--resume` with feedback; **wrong approach entirely** → `--fresh` restart — resuming carries the bad context forward and compounds the drift.
 
-**委派失败无产出也计入轮次**（网关 5xx、沙箱写不进这类基础设施故障连续两次就停），两轮不行自己接手收尾，故障情况如实告诉用户。
+**A delegation that fails with no output still counts as a round** (gateway 5xx, sandbox write failures — two straight infrastructure failures and you stop trying). If two rounds don't work, take over and finish it yourself, and tell the user honestly what went wrong.
 
-给 Codex 的任务书里补一条 `gpt-5-4-prompting` 不会替你想的：**它拿不到你的对话上下文**——涉及文件给绝对路径、写清你已经试过什么和为什么失败，否则它会重犯。
+One more thing for the task brief that `gpt-5-4-prompting` won't think of for you: **Codex has no access to your conversation history** — give absolute paths for every file involved, and write out exactly what's already been tried and why it failed, or it'll repeat the same mistake.

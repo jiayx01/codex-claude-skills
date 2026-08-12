@@ -1,70 +1,72 @@
-# Codex × Claude Code 协作纪律
+# Codex × Claude Code Collaboration Discipline
 
-两个 Skill，分别解决两个问题：`codex-coplan` 管**提智力**，`codex-orchestrator` 管**省资源**。前者引入一个真正独立的第二视角共同推敲方案，让最终结论比单模型闷头想出来的更靠谱；后者把执行阶段的脏活交给 Codex，token 消耗走 Codex 侧、不占 Claude 额度，主线上下文也不会被执行噪音拖垮。
+[简体中文](README.zh-CN.md)
 
-这不是"怎么调用 Codex"的接入教程——那部分官方插件已经做了。这里要解决的是：接入之后，怎么用才不白搭。
+Two Skills, two different problems: `codex-coplan` handles **intelligence** — bring in a genuinely independent second opinion and land on a plan that's better than either model would produce alone. `codex-orchestrator` handles **resource cost** — hand execution grunt work off to Codex so the tokens burn on Codex's side instead of your Claude quota, and your main thread's context doesn't get dragged down by execution noise.
 
-## 先说会遇到什么问题
+This isn't a "how to call Codex" integration guide — the official plugin already covers that. This is about what to do once you're connected, so the connection doesn't go to waste.
 
-如果你已经在用 Claude Code + Codex 这类双模型组合，大概率遇到过以下几种情况：
+## The problems you'll recognize
 
-- **"问问第二个模型的意见"其实只问出了回声**。把自己写好的方案丢给另一个模型，问"你怎么看"，对方大概率顺着你的框架点头，再提几个无关痛痒的修饰意见。这不是独立视角，是一次自我确认——却会让你误以为方案已经经过了交叉验证。
-- **两个模型讨论方案，讨论着讨论着开始说同一句话**。来回追问几轮，表面上"达成共识"，实际是互相锚定、逐渐趋同，第二视角的价值在讨论过程中被磨掉了，最后还是得你自己拍板——等于全程陪跑。
-- **主会话跑着跑着开始变蠢**。一个大任务几十轮工具调用下来，改代码、跑测试、看报错，中间产出全堆在上下文里，后面的判断明显比开头草率——不是模型变笨了，是有效信息被自己制造的噪音稀释了。
-- **委派出去的任务，回来自称"已完成"，实际没做对**。文件写错了目录，测试根本没跑，模型照样汇报"测试通过"。不逐条读 diff 核实，这种委派比不委派更危险。
+If you're already running Claude Code and Codex as a two-model setup, you've probably hit some of these:
 
-这两个 Skill 就是针对上述四类问题写的操作纪律，不是"接个 API 就能用"的功能封装。
+- **"Ask the other model for its opinion" often just returns an echo.** Hand your drafted plan to another model and ask "what do you think," and it'll likely nod along with your framing and offer a few cosmetic tweaks. That's not an independent perspective — it's self-confirmation dressed up as cross-validation.
+- **Two models discussing a plan start saying the same thing.** A few rounds of back-and-forth in, it looks like "consensus," but it's really anchoring — the value of the second perspective erodes as the discussion goes on, and you end up making the call yourself anyway. The extra rounds bought latency, not signal.
+- **The main session gets dumber the longer it runs.** Dozens of tool calls into a large task — edit, test, read the error, repeat — and judgment noticeably degrades from where it started. The model isn't getting worse; the signal is being diluted by the noise it's generating.
+- **A delegated task comes back marked "done" when it isn't.** Files land in the wrong directory, tests never actually ran, and the model reports "tests passing" anyway. Skip reading the diff line by line, and delegation like this ends up worse than doing the work yourself.
 
-## 核心设计思路
+Both Skills are operational discipline written specifically against these four failure modes — not a thin wrapper around an API call.
 
-两个 Skill 表面上管不同的事，底层贯穿着同三条原则：
+## Core design principles
 
-- **独立性是多模型协作价值的唯一来源**。两个模型一上来就互相看到对方的输出，讨论会迅速趋同，"两个视角"退化成"一个视角外加一句附和"。所以 `codex-coplan` 强制第一轮独立起草、互不参考，独立性只有在被污染之前才存在，污染之后补救不了。
-- **模型的自我报告不能当事实，只能当待验证的陈述**。"Codex 说任务已完成"和"另一个模型说它考虑过某个约束"，本质上是同一类不可靠信息——陈述本身就可能是错的。所以 `codex-orchestrator` 验收时要求重跑测试、读 diff，`codex-coplan` 遇到分歧时要求去查事实本身，而不是转述对方怎么说。
-- **用不用、用到什么程度，决策权在人，不在模型**。两个 Skill 都不会看到关键词就自动接管——用户没点名，都不会加载；`codex-orchestrator` 也不会替用户算"这活值不值得委派"的经济账。协作纪律管的是"怎么用"，不能反过来替用户决定"要不要用"。
+The two Skills manage different things on the surface, but they run on the same three underlying principles:
 
-## codex-coplan：让方案质量超过单模型闷头想
+- **Independence is the only source of value in multi-model collaboration.** The moment two models see each other's output, discussion converges fast — "two perspectives" degrades into "one perspective plus an echo." That's why `codex-coplan` forces an independent first draft with zero cross-reference: independence only exists before contamination, and there's no recovering it after.
+- **A model's self-report is not a fact — it's an unverified claim.** "Codex says the task is done" and "the other model says it accounted for some constraint" are the same category of unreliable information: the claim itself might just be wrong. That's why `codex-orchestrator` requires re-running tests and reading diffs at review time, and `codex-coplan` requires checking the underlying fact whenever there's disagreement, instead of taking either model's word for it.
+- **The decision to use this — and how much — belongs to the human, not the model.** Neither Skill activates on keyword-matching alone; without an explicit mention, neither one loads. `codex-orchestrator` doesn't run a cost-benefit check on your behalf, either. Discipline governs *how* to use it — it doesn't get to decide *whether* you should.
+
+## codex-coplan: get a plan better than either model alone
 
 ```mermaid
 flowchart TD
-    A["备料：背景、约束、判断标准、<br/>相关文件绝对路径"] --> B["独立起草<br/>Claude 和 Codex 各写一版，互不参考"]
-    B --> C["分类差异：<br/>共识点 / 单边点 / 冲突点"]
-    C --> D["只追问单边点和冲突点"]
-    D --> E{"还有新分歧？<br/>且未满 3 轮"}
-    E -->|是| C
-    E -->|否| F["核实事实前提<br/>能查的自己查，不转述模型的话"]
-    F --> G["自己决断，交付一版方案"]
+    A["Prep the brief: background, constraints,<br/>judgment criteria, absolute file paths"] --> B["Independent draft<br/>Claude and Codex each write one, zero cross-reference"]
+    B --> C["Classify differences:<br/>agreement / one-sided / conflict"]
+    C --> D["Follow up only on one-sided points and conflicts"]
+    D --> E{"New disagreements?<br/>And under 3 rounds"}
+    E -->|Yes| C
+    E -->|No| F["Verify the underlying facts<br/>check it yourself, don't take the model's word"]
+    F --> G["Make the call, deliver one plan"]
 ```
 
-方案阶段，两个模型共同推敲出一版方案，解决的是智力问题，不是资源问题。
+Plan-stage work, where two models jointly work out a plan. This solves an intelligence problem, not a resource problem.
 
-核心是保证"第二意见"真的独立，而非自我确认的幻觉：先各自独立写一版方案、互不参考，再只针对真正的分歧点追问；追问时优先核实客观事实（这个字段存不存在、这个权限有没有），而不是被动接受模型转述的说法。两个独立视角汇合之后，才能避开单个模型自己想不到的盲区——最终交付一份吸收双方意见的方案，不允许甩一句"Codex 认为……我认为……"就把判断题丢给你自己做。
+The core mechanism is making sure the "second opinion" is genuinely independent, not a hallucinated confirmation: each side drafts separately with zero cross-reference, and follow-ups then target only the real points of disagreement — prioritizing verification of the underlying fact (does this field exist, is this permission actually granted) over taking either model's account at face value. Once two independent perspectives converge, you catch blind spots that either model would've missed alone — and the final deliverable is one plan that has absorbed both viewpoints, never a punt like "Codex thinks X, I think Y" that leaves the judgment call to you.
 
-## codex-orchestrator：把执行阶段的脏活交出去
+## codex-orchestrator: hand off the execution grunt work
 
 ```mermaid
 flowchart TD
-    A["Claude 规划拆解任务"] --> B["写任务书委派给 Codex<br/>绝对路径 + 已尝试方案 + 失败原因"]
-    B --> C["Codex 执行<br/>改代码 / 跑测试 / 改 bug"]
-    C --> D["Claude 验收<br/>自己重跑测试 + 读 diff 核对范围"]
-    D --> E{"通过？"}
-    E -->|局部没改对| F["--resume 带反馈重试"]
-    E -->|方向错了| G["--fresh 重开"]
-    E -->|连续两次基础设施故障| H["自己接手收尾"]
-    E -->|通过| I["完成"]
+    A["Claude plans and breaks down the task"] --> B["Write a task brief, delegate to Codex<br/>absolute paths + what's been tried + why it failed"]
+    B --> C["Codex executes<br/>edit code / run tests / fix bugs"]
+    C --> D["Claude reviews<br/>re-run tests yourself + read the diff against scope"]
+    D --> E{"Passed?"}
+    E -->|Partially wrong| F["--resume with feedback"]
+    E -->|Wrong approach| G["--fresh restart"]
+    E -->|2 straight infra failures| H["Take over and finish it yourself"]
+    E -->|Passed| I["Done"]
     F --> C
     G --> C
 ```
 
-执行阶段，Claude 规划 + Codex 干活，解决的是资源问题，不是智力问题。
+Execution-stage work: Claude plans, Codex executes. This solves a resource problem, not an intelligence problem.
 
-把"写代码 → 跑测试 → 改 bug"这种会产生大量中间噪音的循环，整个交给 Codex。执行 token 烧在 Codex 侧、不占 Claude 额度，主线 Claude 只做任务拆解和验收，上下文不被执行细节污染。核心是把委派最容易翻车的几个坑写成硬性规则：沙箱可写根目录到底是哪个、Codex 自称"已完成"为什么不能信、改动没改对该用 `--resume` 追加还是方向错了该用 `--fresh` 重开。
+The "write code → run tests → fix bugs" loop generates a lot of intermediate noise — hand the whole thing to Codex. Execution tokens burn on Codex's side and never touch your Claude quota; the main Claude thread only plans and reviews, so its context stays clean. The core value here is turning the easiest ways to get burned by delegation into hard rules: which directory is actually the sandbox's writable root, why Codex claiming "done" can't be trusted, and whether a failed attempt calls for `--resume` with feedback or a `--fresh` restart because the whole approach was wrong.
 
-## 安装
+## Install
 
-### 第一步：在 Claude Code 里接入 Codex 官方插件
+### Step 1: Connect the official Codex plugin in Claude Code
 
-这两个 Skill 依赖 [OpenAI 官方 Codex 插件](https://github.com/openai/codex-plugin-cc)，如果还没装，先在 Claude Code 里执行：
+Both Skills depend on the [official OpenAI Codex plugin](https://github.com/openai/codex-plugin-cc). If you haven't installed it yet, run this inside Claude Code:
 
 ```bash
 /plugin marketplace add openai/codex-plugin-cc
@@ -73,36 +75,36 @@ flowchart TD
 /codex:setup
 ```
 
-`/codex:setup` 会检测本机 Codex CLI 是否就绪：没装会提示是否用 `npm install -g @openai/codex` 帮你装，装了但没登录会提示用 `!codex login` 登录。全部就绪后，`/agents` 列表里应该能看到 `codex:codex-rescue` 子代理，说明插件已经生效。
+`/codex:setup` checks whether the Codex CLI is ready on your machine: if it's missing, it'll offer to install it via `npm install -g @openai/codex`; if it's installed but not logged in, it'll prompt you to run `!codex login`. Once everything's set up, you should see the `codex:codex-rescue` subagent in your `/agents` list, confirming the plugin is active.
 
-官方插件的前提条件（来自 [官方 README](https://github.com/openai/codex-plugin-cc)）：
+Prerequisites for the official plugin (from its [README](https://github.com/openai/codex-plugin-cc)):
 
-- ChatGPT 订阅（含免费版）或 OpenAI API key——这两个 Skill 委派执行时消耗的 token，走的正是这条线，不占 Claude 侧额度
-- Node.js 18.18 或更高版本
+- A ChatGPT subscription (including the free tier) or an OpenAI API key — this is the line delegated execution tokens run on, and it never touches your Claude-side quota
+- Node.js 18.18 or later
 
-### 第二步：装这两个 Skill
+### Step 2: Install these two Skills
 
 ```bash
 git clone https://github.com/jiayx01/codex-claude-skills.git
 cp -r codex-claude-skills/skills/codex-coplan codex-claude-skills/skills/codex-orchestrator ~/.claude/skills/
 ```
 
-装好之后正常使用 Claude Code，在需要的场景里点名即可：
+Once installed, use Claude Code as usual and just name Codex when the scenario calls for it:
 
-- 「和 codex 讨论一下这个方案」「问问 codex 怎么看」→ 触发 `codex-coplan`
-- 「这个甩给 codex 做」「用 codex 把这几个测试修了」→ 触发 `codex-orchestrator`
+- "Let's discuss this with Codex" / "What does Codex think about this?" → triggers `codex-coplan`
+- "Hand this off to Codex" / "Have Codex fix these failing tests" → triggers `codex-orchestrator`
 
-`codex-orchestrator` 里的 `--model`/`--effort` 参数，需要换成你自己账号或网关实际支持的值。
+The `--model`/`--effort` flags inside `codex-orchestrator` need to be swapped for whatever your own account or gateway actually supports.
 
-## 适合谁
+## Who this is for
 
-- 已经在用 Claude Code，并且有独立可用的 Codex 访问权限（不限接入方式）的人
-- 需要"真第二意见"来验证方案，或者需要把大块执行任务甩出去、保持主线上下文干净的人
+- Anyone already running Claude Code with independent, working access to Codex, however it's connected
+- Anyone who wants a genuine second opinion to pressure-test a plan, or needs to offload large execution tasks while keeping the main thread's context clean
 
-## 不适合什么
+## Who this isn't for
 
-- 只用单一模型、没有第二个独立模型可用——这套东西的前提是你手上确实有两个独立的判断源，不是靠 prompt 让同一个模型扮演两个角色
-- 想要全自动、不需要人管的黑盒方案——这两个 Skill 恰恰依赖明确的人工验收和最终裁决来把关，不是让两个模型商量着自己定
+- Anyone running a single model with no second, independent model available — this whole approach assumes you actually have two independent sources of judgment, not one model prompted into playing two roles
+- Anyone wanting a fully automatic, hands-off black box — these two Skills specifically depend on explicit human review and final judgment calls; they're not two models quietly deciding things between themselves
 
 ## License
 
