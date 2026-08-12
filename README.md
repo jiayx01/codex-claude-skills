@@ -29,12 +29,12 @@ The two Skills manage different things on the surface, but they run on the same 
 
 ```mermaid
 flowchart TD
-    A["Prep the brief: background, constraints,<br/>judgment criteria, absolute file paths"] --> B["Independent draft<br/>Claude and Codex each write one, zero cross-reference"]
-    B --> C["Classify differences:<br/>agreement / one-sided / conflict"]
+    A["Prep the brief: background, constraints, judgment criteria, absolute file paths"] --> B["Independent draft: Claude and Codex each write one, zero cross-reference"]
+    B --> C["Classify differences: agreement / one-sided / conflict"]
     C --> D["Follow up only on one-sided points and conflicts"]
-    D --> E{"New disagreements?<br/>And under 3 rounds"}
+    D --> E{"New disagreements, and under 3 rounds?"}
     E -->|Yes| C
-    E -->|No| F["Verify the underlying facts<br/>check it yourself, don't take the model's word"]
+    E -->|No| F["Verify the underlying facts: check it yourself, don't take the model's word"]
     F --> G["Make the call, deliver one plan"]
 ```
 
@@ -46,9 +46,9 @@ The core mechanism is making sure the "second opinion" is genuinely independent,
 
 ```mermaid
 flowchart TD
-    A["Claude plans and breaks down the task"] --> B["Write a task brief, delegate to Codex<br/>absolute paths + what's been tried + why it failed"]
-    B --> C["Codex executes<br/>edit code / run tests / fix bugs"]
-    C --> D["Claude reviews<br/>re-run tests yourself + read the diff against scope"]
+    A["Claude plans and breaks down the task"] --> B["Write a task brief, delegate to Codex: absolute paths + what's been tried + why it failed"]
+    B --> C["Codex executes: edit code / run tests / fix bugs"]
+    C --> D["Claude reviews: re-run tests yourself + read the diff against scope"]
     D --> E{"Passed?"}
     E -->|Partially wrong| F["--resume with feedback"]
     E -->|Wrong approach| G["--fresh restart"]
